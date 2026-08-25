@@ -215,7 +215,8 @@
     "h-notifications": renderNotifList,
     "r-availability": renderBloodGrid,
     "ad-analytics": renderAnalytics,
-    "ad-audit": renderAdminAuditTable
+    "ad-audit": renderAdminAuditTable,
+    "h-triage": renderTriageApplyToOptions
   };
 
   function runRenderer(viewId) {
@@ -415,6 +416,20 @@
 
   let lastTriageSuggestion = null;
 
+  // Keeps the "Apply this triage to" dropdown in sync with whoever is
+  // actually active right now, so a triage result can be applied to a
+  // real registered patient instead of always spawning a new one.
+  function renderTriageApplyToOptions() {
+    const sel = $("#tApplyTo");
+    if (!sel) return;
+    const previousValue = sel.value;
+    const active = db.patients.filter(p => !TERMINAL_STATUSES.includes(p.status));
+    sel.innerHTML =
+      `<option value="__new__">Register as a new patient</option>` +
+      active.map(p => `<option value="${esc(p.id)}">${esc(p.name)} (${esc(p.id)} — currently ${esc(p.priority)})</option>`).join("");
+    if ([...sel.options].some(o => o.value === previousValue)) sel.value = previousValue;
+  }
+
   function wireTriage() {
     const runBtn = $("#runTriageAI");
     if (!runBtn) return;
@@ -482,24 +497,40 @@
   }
 
   function finalizeTriage(priority, action, reason) {
-    const input = lastTriageSuggestion ? lastTriageSuggestion.input : {};
-    const name = (input.symptoms ? "New Triage Patient" : "New Triage Patient");
-    nextPatientSeq++;
-    const patient = {
-      id: "LF-" + nextPatientSeq,
-      name: name + " #" + nextPatientSeq,
-      arrival: "Walk-in",
-      priority,
-      waitingMin: 0,
-      dept: "Emergency",
-      status: "Waiting"
-    };
-    db.patients.unshift(patient);
+    const applyToSel = $("#tApplyTo");
+    const applyToId = applyToSel ? applyToSel.value : "__new__";
+    let patient;
+    let isExisting = false;
+
+    if (applyToId && applyToId !== "__new__") {
+      patient = db.patients.find(p => p.id === applyToId);
+      isExisting = !!patient;
+    }
+
+    if (isExisting) {
+      // Apply the result to the patient actually selected — this is what
+      // keeps Register → Emergency Snapshot → AI Triage as one continuous
+      // patient instead of spawning an unrelated new record.
+      patient.priority = priority;
+      patient.waitingMin = 0;
+    } else {
+      nextPatientSeq++;
+      patient = {
+        id: "LF-" + nextPatientSeq,
+        name: "New Triage Patient #" + nextPatientSeq,
+        arrival: "Walk-in",
+        priority,
+        waitingMin: 0,
+        dept: "Emergency",
+        status: "Waiting"
+      };
+      db.patients.unshift(patient);
+    }
 
     const verb = action === "confirmed" ? "Triage confirmed" : action === "modified" ? "Triage modified" : "Triage overridden";
     logAudit(verb, "N. Kulkarni", patient.name, "triage");
-    pushNotification(`${verb} — ${priority}`, reason ? `${patient.name} · ${reason}` : `${patient.name} · added to live queue`);
-    toast(`${verb}: ${patient.name} added to the queue as ${priority}`);
+    pushNotification(`${verb} — ${priority}`, reason ? `${patient.name} · ${reason}` : `${patient.name} · ${isExisting ? "priority updated in" : "added to"} the live queue`);
+    toast(`${verb}: ${patient.name} ${isExisting ? "updated to" : "added to the queue as"} ${priority}`);
 
     const sub = $("#triageSubPanel");
     if (sub) sub.remove();
@@ -642,6 +673,53 @@
       if (viewIsActive("h-queue")) renderFullQueueTable();
       if (viewIsActive("h-management")) renderManagementTable();
     });
+  }
+
+  /* ========================================================================
+     9b. STATIC FORMS — Contact, Medical Profile, System Settings
+     These previously had onsubmit="return false" and no JS behind them at
+     all, so clicking Send/Save did nothing. They're still frontend-only
+     (no server to actually send an email or persist a profile edit to),
+     but they now give real confirmation feedback, and System Settings
+     actually updates the live escalation thresholds used by the queue.
+     ======================================================================== */
+
+  function wireStaticForms() {
+    const contactForm = $("#contactForm");
+    if (contactForm) {
+      contactForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = $("#contactName").value.trim();
+        $("#contactStatus").innerHTML = `✅ Thanks${name ? ", " + esc(name) : ""} — your message has been sent. The Lifora team will get back to you shortly.`;
+        toast("Message sent");
+        contactForm.reset();
+      });
+    }
+
+    const profileForm = $("#profileForm");
+    if (profileForm) {
+      profileForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        logAudit("Medical profile updated", "Aarav Rao", "Aarav Rao", "profile");
+        $("#profileStatus").textContent = "✅ Profile changes saved.";
+        toast("Profile updated");
+      });
+    }
+
+    const settingsForm = $("#settingsForm");
+    if (settingsForm) {
+      settingsForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const red = parseInt($("#settingsRedThreshold").value, 10);
+        const orange = parseInt($("#settingsOrangeThreshold").value, 10);
+        if (!isNaN(red) && red > 0) ESCALATION_THRESHOLD.RED = red;
+        if (!isNaN(orange) && orange > 0) ESCALATION_THRESHOLD.ORANGE = orange;
+        logAudit("Escalation thresholds updated", "Hospital Admin", `RED ${ESCALATION_THRESHOLD.RED}m / ORANGE ${ESCALATION_THRESHOLD.ORANGE}m`, "settings");
+        $("#settingsStatus").innerHTML = `✅ Saved — RED now escalates at ${ESCALATION_THRESHOLD.RED} min, ORANGE at ${ESCALATION_THRESHOLD.ORANGE} min. This applies immediately to the live queue.`;
+        toast("Settings saved — escalation thresholds updated");
+        if (viewIsActive("h-dashboard")) renderHospitalDashboard();
+      });
+    }
   }
 
   /* ========================================================================
@@ -1013,6 +1091,7 @@
     wireAlertContacts();
     wireAmbulance();
     wireEmergencyMode();
+    wireStaticForms();
 
     // Render the views that are active by default on first paint.
     renderHospitalDashboard();
