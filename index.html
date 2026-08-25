@@ -202,13 +202,14 @@
         <!-- CONTACT -->
         <div class="view" id="view-contact">
           <div class="page-head"><span class="eyebrow">Contact</span><h1>Talk to the Lifora team</h1></div>
-          <form class="form-grid contact-form" onsubmit="return false;">
-            <label>Full name<input type="text" placeholder="Your name"></label>
-            <label>Email<input type="email" placeholder="you@example.com"></label>
-            <label class="span-2">Organization<input type="text" placeholder="Hospital / clinic / company"></label>
-            <label class="span-2">Message<textarea rows="4" placeholder="How can we help?"></textarea></label>
+          <form class="form-grid contact-form" id="contactForm">
+            <label>Full name<input type="text" id="contactName" placeholder="Your name"></label>
+            <label>Email<input type="email" id="contactEmail" placeholder="you@example.com"></label>
+            <label class="span-2">Organization<input type="text" id="contactOrg" placeholder="Hospital / clinic / company"></label>
+            <label class="span-2">Message<textarea rows="4" id="contactMessage" placeholder="How can we help?"></textarea></label>
             <button class="btn btn-primary span-2" type="submit">Send message</button>
           </form>
+          <p class="section-note" id="contactStatus"></p>
         </div>
 
       </main>
@@ -321,7 +322,7 @@
         <!-- MEDICAL PROFILE -->
         <div class="view" id="view-p-profile">
           <div class="page-head"><span class="eyebrow">Medical Profile</span><h1>Personal &amp; medical details</h1></div>
-          <form class="form-grid" onsubmit="return false;">
+          <form class="form-grid" id="profileForm">
             <label>Full name<input type="text" value="Aarav Rao"></label>
             <label>Date of birth<input type="text" value="14 Mar 1994"></label>
             <label>Blood group
@@ -333,6 +334,7 @@
             <label class="span-2">Previous surgeries<input type="text" value="Appendectomy — 2019, City Hospital"></label>
             <button class="btn btn-primary span-2" type="submit">Save profile</button>
           </form>
+          <p class="section-note" id="profileStatus"></p>
         </div>
 
         <!-- MEDICAL HISTORY -->
@@ -625,6 +627,11 @@
               <label>SpO₂ (%)<input type="number" id="tSpo2" placeholder="e.g. 94"></label>
               <label>Age<input type="number" id="tAge" placeholder="e.g. 40"></label>
               <label class="span-2">Injury / relevant history<input type="text" id="tHistory" placeholder="e.g. RTA, suspected internal bleeding"></label>
+              <label class="span-2">Apply this triage to
+                <select id="tApplyTo">
+                  <option value="__new__">Register as a new patient</option>
+                </select>
+              </label>
               <button class="btn btn-primary span-2" type="button" id="runTriageAI">Generate AI triage suggestion</button>
             </form>
             <div class="card triage-result-card">
@@ -920,15 +927,16 @@
 
         <div class="view" id="view-ad-settings">
           <div class="page-head"><span class="eyebrow">System Settings</span><h1>Thresholds &amp; policy</h1></div>
-          <form class="form-grid" onsubmit="return false;">
-            <label>Escalation threshold — RED (minutes)<input type="number" value="10"></label>
-            <label>Escalation threshold — ORANGE (minutes)<input type="number" value="20"></label>
-            <label>Emergency contact response window (minutes)<input type="number" value="5"></label>
+          <form class="form-grid" id="settingsForm">
+            <label>Escalation threshold — RED (minutes)<input type="number" id="settingsRedThreshold" value="10" min="1"></label>
+            <label>Escalation threshold — ORANGE (minutes)<input type="number" id="settingsOrangeThreshold" value="20" min="1"></label>
+            <label>Emergency contact response window (minutes)<input type="number" value="5" min="1"></label>
             <label>Notification channel priority
               <select><option>SMS → Call → In-app</option><option>Call → SMS → In-app</option><option>In-app → SMS → Call</option></select>
             </label>
             <button class="btn btn-primary span-2" type="submit">Save settings</button>
           </form>
+          <p class="section-note" id="settingsStatus"></p>
         </div>
 
       </main>
